@@ -22,10 +22,10 @@ User Function MI11TO12()
 	Local aPar			:= {}
 	Local aRet			:= {}
 	Private lXBackup	:= .F.	
-	Private cXRotina	:= "SUA EMPRESA | Migrador V1.0"	
+	Private cXRotina	:= "SUA_EMPRESA | Migrador V1.0"	
 	
 	// Ajusta parâmetros
-	aAdd(aPar,{2,"Fazer backup das tabelas" ,"1",{"Sim","Não"}, 50,".T." , .T.})
+	aAdd(aPar,{2,"Fazer backup das tabelas" ,"1",{"1-Sim","2-Não"}, 50,".T." , .T.})
 	
 	// Cria tela para confirmar processamento
 	AADD(aSays,OemToAnsi( "Processo para ajustar as tabelas da base de dados para migração de versão." ) )
@@ -58,7 +58,7 @@ User Function MI11TO12()
 	If lXContinua
 	
 		// Ajusta variável de backup
-		If Alltrim(cValToChar(MV_PAR01)) == "1"
+		If SubStr(cValToChar(MV_PAR01),1,1) == "1"
 			lXBackup := .T.
 		EndIf
 	
@@ -147,7 +147,7 @@ Static Function fMI11TO12(cXModo)
 				For nA := 1 to Len(aXAux)
 					
 					// Captura nome da tabela
-					cXTabela := Iif((Len(Alltrim(aXAux[nA])) = 3),Upper(Alltrim(aXAux[nA])+cEmpAnt+"0"),Upper(Alltrim(aXAux[nA])))
+					cXTabela := Iif((Len(Alltrim(aXAux[nA])) = 3),Upper(Alltrim(aXAux[nA])+cEmpAnt+"0"),Upper(Alltrim(SubStr(aXAux[nA]+Space(6),1,6))))
 					cXTab	:= SubStr(cXTabela+Space(3),1,3)
 					
 					// Verificas se será verificada uma tabela padrão ou estrutura de dados
@@ -354,7 +354,6 @@ Static Function fSql11To12(cXError)
 		EndIf
 		
 	EndIf
-
 	RestArea(aXArea)
 	
 Return(.T.)
