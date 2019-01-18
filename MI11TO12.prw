@@ -427,13 +427,16 @@ Static Function fApp11To12(cXTab,cXTabela,cXTabDbf,cXError)
 
 		// Ajusta variáveis
 		cXOpenTab := cXDirBkp+cXTabDbf
-		//DBUseArea( .T., "DBFCDXADS", cXDirBkp+cXTabDbf, 'ORIGEM', .F., .F. )
 		
 		USE &cXOpenTab ALIAS ('ORIGEM') EXCLUSIVE NEW VIA "DBFCDXADS"
 
 		If !NetErr()
 		
-			COPY TO &cXTabela ALL VIA 'TOPCONN'
+			RDDSetDefault("TOPCONN")
+			ChkFile(cXTab)
+			dbSelectArea(cXTab)			
+			
+			APPEND FROM 'ORIGEM'			
 
 			// Fecha tabela origem
 			If Select('ORIGEM') > 0
@@ -444,14 +447,7 @@ Static Function fApp11To12(cXTab,cXTabela,cXTabDbf,cXError)
 			If Select(cXTab) > 0
 				(cXTab)->(dbCloseArea())
 			EndIf
-		
-			// Abre tabela
-			ChkFile(cXTab)
-			dbSelectArea(cXTab)
-			(cXTab)->(dbCloseArea())
-			
 
-		
 		Else
 		
 			cXError := "Nao foi possivel abrir "+cXOpenTab+" em modo EXCLUSIVO."
@@ -462,7 +458,9 @@ Static Function fApp11To12(cXTab,cXTabela,cXTabDbf,cXError)
 	EndIf
 	
 	RestArea(aXArea)
+	
 Return lRet
+
 
 /*/{Protheus.doc} fSql11To12
 // Função para executar updates diretamente na base
