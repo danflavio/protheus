@@ -22,6 +22,7 @@ User Function MI11TO12()
 	Local aPar			:= {}
 	Local aRet			:= {}
 	Private lXBackup	:= .F.	
+	Private lXAppend	:= .F.
 	Private cXRotina	:= "SUA_EMPRESA | Migrador V1.0"	
 	
 	// Ajusta parâmetros
@@ -91,52 +92,62 @@ Return
 @param cXModo, characters, Modo da Função
 @type static function
 /*/
-Static Function fMI11TO12(cXModo)
+Static Function fMI11TO12(cXModo,lXPos)
 	Local cNomeArq		:= Lower(Alltrim(FunName()))
 	Local cXExtensao	:= ".txt"
 	Local cXPath		:= "migracao"
+	Local cXPathBkp		:= "/"+cXPath+"/"+"backup/*"
 	Local cFile			:= ""
 	Local cXTab			:= ""
 	Local cXTabela		:= ""	
 	Local cXError		:= ""
+	Local cXErrorApp	:= ""
 	Local lXContinua	:= .F.
 	Local oXFile		:= NIL
 	Local aXAux			:= {}
 	Local aXAux2		:= {}
+	Local aFiles 		:= {} 
+	Local aSizes 		:= {} 	
 	Local lRet			:= .T.
 	Local nA			:= 0
+	Local lXExec		:= .F.
+	Local lXAux			:= .F.
 	Local xAuxValOld	:= NIL
 	Local xAuxValNew	:= NIL
 	Default cXModo		:= "XXX"
+	Default lXPos		:= .F.		
 
 	// Ajuste de variáveis
 	If cXModo == "PRE"
 	
-		cFile := cXPath+"\"+cNomeArq+cXExtensao
+		If lXPos
+			cFile := cXPath+"\"+cNomeArq+"_pos"+cXExtensao		
+		Else
+			cFile := cXPath+"\"+cNomeArq+cXExtensao
+		EndIf
 		
-	Else
+	ElseIf cXModo == "POS"
 	
-		MsgStop("Opção ["+cXModo+"] ainda não implantada.")
-		Return(.F.)
-		
+		cFile := cXPath+"\"+cNomeArq+"_pos"+cXExtensao
+	
 	EndIf
 	
 	cFile := Alltrim(cFile)
 	oXFile := FWFileReader():New(cFile)
-	
-	If (oXFile:Open())
-	
-		aXAux := oXFile:getAllLines()
+		
+	// Percorre array de acordo com as tabelas passadas no arquivo .txt
+	If cXModo == "PRE" 
 
-		// Verifica conteúdo do arquivo
-		If Empty(aXAux)
-			MsgStop('Arquivo vazio.')
-			Return(.F.)
-		EndIf
+		If (oXFile:Open())
 		
-		// Percorre array de acordo com as tabelas passadas no arquivo .txt
-		If cXModo == "PRE" 
-		
+			aXAux := oXFile:getAllLines()
+	
+			// Verifica conteúdo do arquivo
+			If Empty(aXAux)
+				MsgStop('Arquivo vazio.')
+				Return(.F.)
+			EndIf		
+	
 			// Primeiramente executa as instruções diretamente na base
 			// Baseado na verificação da rotina CheckDupl
 			If fSql11To12(@cXError)
@@ -181,14 +192,9 @@ Static Function fMI11TO12(cXModo)
 									If lXContinua
 									
 										// Drop de tabela
-										If Select(cXTab) > 0
-											(cXTab)->(dbCloseArea())
-										EndIf
-										
-										If !TcDelFile(cXTabela)
-											cXError := "Falha ao apagar "+cXTab+" : "+ TcSqlError()
+										If !fDropaTab(cXTab,cXTabela,@cXError)
 											Exit
-										EndIf					 		
+										EndIf
 									
 									Else
 									
@@ -200,13 +206,8 @@ Static Function fMI11TO12(cXModo)
 								Else
 								
 									// Drop de tabela
-									If Select(cXTab) > 0
-										(cXTab)->(dbCloseArea())
-									EndIf
-									
-									If !TcDelFile(cXTabela)
-										cXError := "Falha ao apagar "+cXTab+" : "+ TcSqlError()
-									 	Exit
+									If !fDropaTab(cXTab,cXTabela,@cXError)
+										Exit
 									EndIf
 									 		
 								EndIf
@@ -285,16 +286,86 @@ Static Function fMI11TO12(cXModo)
 			If !Empty(cXError)
 				MsgStop(cXError)
 			Else
-				MsgInfo("Ajuste de base concluído com sucesso"+CRLF+CRLF+"Favor executar a rotina MP710TO120",cXRotina)
+				If lXPos
+					MsgInfo("Ajuste de base concluído com sucesso.",cXRotina)				
+				Else
+					MsgInfo("Ajuste de base concluído com sucesso."+CRLF+CRLF+"Favor executar a rotina MP710TO120",cXRotina)
+				EndIf
 			EndIf
 			
+		Else
+
+			MsgStop("Não foi possível abrir o arquivo. ["+Alltrim(Lower(cFile))+"]",cXRotina)
+
 		EndIf
 	
-	Else
+	ElseIf cXModo == "POS"
+
+		// Segunda execução, ajustes na estrutura 
+		If MsgYesNo("Deseja realizar alterações nos arquivos de estrutura de dados?"+CRLF;
+					+"Precisa disponibilizar o arquivo no caminho abaixo:"+CRLF;
+					+cFile,cXRotina)
+					
+			StaticCall(MI11TO12,fMI11TO12,"PRE",.T.)		
+		
+		EndIf			
 	
-		MsgStop("Não foi possível abrir o arquivo. ["+Alltrim(Lower(cFile))+"]")
 	
-	EndIf	
+		// Preenche uma série de arrays com informações de arquivos e diretórios
+		aDir(cXPathBkp,aFiles,aSizes)
+		
+		// Pergunta se deseja realizar o append das tabelas
+		lXAppend := MsgYesNo("Deseja realizar o APPEND das tabelas que possuem backup na pasta ["+cXPathBkp+"]?")
+		
+		If !Empty(aFiles)
+		
+			For nA := 1 to Len(aFiles)
+			
+				If At(Upper(".dbf"),Upper(aFiles[nA])) > 0
+					
+					// Captura nome da tabela
+					cXTabela := Upper(SubStr(aFiles[nA],1,3))+cEmpAnt+"0"
+					cXTab := Upper(SubStr(aFiles[nA],1,3))
+					
+					If lXAppend
+						FWMsgRun(, {|| lXContinua := fApp11To12(cXTab,cXTabela,Alltrim(aFiles[nA]),@cXErrorApp) }, cXRotina, "Realizando append na tabela "+cXTab)
+						Iif((!Empty(cXErrorApp)),cXError += cXErrorApp+CRLF,NIL)
+						lXExec := .T.
+					Else
+					
+						// Recria a tabela caso não exista
+						FWMsgRun(, {|| ChkFile(cXTab) }, cXRotina, "Recriando tabela "+cXTab)
+						lXExec := .T.
+												
+					EndIf
+
+				EndIf 
+			
+			Next
+
+			// Verifica se rotina foi executada
+			If lXExec
+			
+				// Se existir erro exibe a mensagem
+				If !Empty(cXError)
+					MsgStop(cXError)
+				ElseIf lXAppend
+					MsgInfo("Append Finalizado.",cXRotina)
+				Else
+					MsgInfo("Tabelas Recriadas.",cXRotina)				
+				EndIf			
+			
+			Else
+				MsgInfo("Rotina Finalizada.",cXRotina)
+			EndIf
+		
+		Else
+		
+			MsgStop("Pasta de backup não existe ou está vazia. ["+Alltrim(Lower(cXPathBkp))+"]",cXRotina)
+			
+		EndIf
+		
+	EndIf
 
 Return lRet
 
@@ -328,6 +399,71 @@ Static Function fBkp11To12(cXTab,cXTabela)
 Return lRet
 
 
+/*/{Protheus.doc} fApp11To12
+// Função que realiza o Append nas tabelas
+@author danielflavio
+@since 14/01/2019
+@version 1.0
+@return lRet, Append realizado com sucesso ou não
+@param cXTab, characters, descricao
+@type static function
+/*/
+Static Function fApp11To12(cXTab,cXTabela,cXTabDbf,cXError)
+	Local aXArea	:= GetArea()
+	Local cXPath	:= "migracao"
+	Local cXDirBkp	:= cXPath+"\backup\"
+	Local cXWay		:= cXDirBkp+Lower(cXTabDbf)
+	Local aStruct	:= {}
+	Local lRet		:= .T.
+	Local lXAux		:= .F.
+	Local cXOpenTab	:= ""
+	Default cXError	:= ""
+
+	// Ajuste de variáveis
+	cXError := ""
+	
+	// Drop de tabela
+	If fDropaTab(cXTab,cXTabela,@cXError)	
+
+		// Ajusta variáveis
+		cXOpenTab := cXDirBkp+cXTabDbf
+		//DBUseArea( .T., "DBFCDXADS", cXDirBkp+cXTabDbf, 'ORIGEM', .F., .F. )
+		
+		USE &cXOpenTab ALIAS ('ORIGEM') EXCLUSIVE NEW VIA "DBFCDXADS"
+
+		If !NetErr()
+		
+			COPY TO &cXTabela ALL VIA 'TOPCONN'
+
+			// Fecha tabela origem
+			If Select('ORIGEM') > 0
+				ORIGEM->(dbCloseArea())
+			EndIf
+		
+			// Fecha Tabela
+			If Select(cXTab) > 0
+				(cXTab)->(dbCloseArea())
+			EndIf
+		
+			// Abre tabela
+			ChkFile(cXTab)
+			dbSelectArea(cXTab)
+			(cXTab)->(dbCloseArea())
+			
+
+		
+		Else
+		
+			cXError := "Nao foi possivel abrir "+cXOpenTab+" em modo EXCLUSIVO."
+			lRet := .F.
+		
+		EndIf
+		
+	EndIf
+	
+	RestArea(aXArea)
+Return lRet
+
 /*/{Protheus.doc} fSql11To12
 // Função para executar updates diretamente na base
 @author danielflavio
@@ -346,7 +482,7 @@ Static Function fSql11To12(cXError)
 	// Exemplo: Limpando registros vazios na ALI010
 	If TCCanOpen(RetSqlName("ALI"))
 	
-		cQuery := "UPDATE "+RetSqlName('ALI')+" SET D_E_L_E_T_='*' WHERE D_E_L_E_T_=' ' AND ALI_FILIAL=' '"
+		cQuery := "UPDATE "+RetSqlName("ALI")+" SET D_E_L_E_T_='*' WHERE D_E_L_E_T_=' ' AND ALI_FILIAL=' '"
 		
 		If TcSqlExec(cQuery) < 0
 			cXError := "Erro na execução da query "+CRLF+cQuery
@@ -354,6 +490,46 @@ Static Function fSql11To12(cXError)
 		EndIf
 		
 	EndIf
+	
 	RestArea(aXArea)
 	
 Return(.T.)
+
+
+/*/{Protheus.doc} fDropaTab
+// Função para dropar determinada tabela
+@author danielflavio
+@since 18/01/2019
+@version 1.0
+@return lXRet, Dropou a tabela ou não
+@param cXTab, characters, Ex.: SE1
+@param cXTabela, characters, EX.: SE1010
+@param cXError, characters, String que recerá retorno da operação de DROP
+@type static function
+/*/
+Static Function fDropaTab(cXTab,cXTabela,cXError)
+	Local lXRet := .F.
+
+	// Ajusta variável
+	cXError := ""
+
+	If TCCanOpen(cXTabela)
+
+		// Drop de tabela
+		If Select(cXTab) > 0
+			(cXTab)->(dbCloseArea())
+		EndIf	
+	
+		FWMsgRun(, {|| lXRet := TcDelFile(cXTabela) }, cXRotina, "Dropando tabela "+cXTab)
+	
+		If !lXRet 
+			cXError := "Falha ao apagar "+cXTab+" : "+ TcSqlError()
+		EndIf
+	
+	Else
+		
+		lXRet := .T.
+		
+	EndIf	
+			
+Return lXRet
