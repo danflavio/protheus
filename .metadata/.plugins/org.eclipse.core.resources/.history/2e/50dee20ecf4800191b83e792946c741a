@@ -1,0 +1,55 @@
+package course;
+
+import java.util.Locale;
+import java.util.Scanner;
+
+import entites.ContaBancaria;;
+
+public class Program {
+
+	public static void main(String[] args) {
+
+		Locale.setDefault(Locale.US);
+		Scanner sc = new Scanner(System.in);
+
+		double initialDeposit = 0;
+		double valueOperation = 0;
+
+		System.out.print("Enter account number: ");
+		int numberAccount = sc.nextInt();
+
+		sc.nextLine();
+
+		System.out.print("Enter account holder: ");
+		String nameClient = sc.nextLine();
+
+		System.out.print("Is there an initial deposit (y/n)? ");
+		boolean isInitialDeposit = (sc.nextLine().toLowerCase().charAt(0) == 'y') ? true : false;
+
+		if (isInitialDeposit) {
+			System.out.print("Enter initial deposit value: ");
+			initialDeposit = sc.nextDouble();
+		}
+
+		ContaBancaria account = new ContaBancaria(numberAccount, nameClient);
+		account.deposit(initialDeposit);
+		System.out.println(account);
+
+		System.out.print("Enter account number: ");
+		numberAccount = sc.nextInt();
+
+		System.out.print("Enter a deposit value: ");
+		valueOperation = sc.nextDouble();
+		account.deposit(valueOperation);
+		System.out.println(account);
+
+		System.out.print("Enter a withdraw value: ");
+		valueOperation = sc.nextDouble();
+		account.sake(valueOperation);
+		System.out.println(account);
+
+		sc.close();
+
+	}
+
+}

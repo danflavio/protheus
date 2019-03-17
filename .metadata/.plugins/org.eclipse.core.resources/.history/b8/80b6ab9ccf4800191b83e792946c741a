@@ -1,0 +1,22 @@
+package course;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class Program {
+
+	public static void main(String[] args) {
+
+		List<Integer> list = new ArrayList<>();
+		list.add(150);
+		list.add(1);
+		
+		for (Integer x : list) {
+			
+			System.out.println(x);
+			
+		}
+		
+	}
+
+}
