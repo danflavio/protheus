@@ -4,7 +4,7 @@
 
 
 /*/{Protheus.doc} MI11TO12
-// Função de que auxilia a migração de versão P11 para P12
+// Função de que auxilia a migração de versão P11 para P12.1.17
 @author danielflavio
 @since 15/01/2019
 @version 1.0
